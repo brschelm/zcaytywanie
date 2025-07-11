@@ -82,7 +82,6 @@ def main():
         openai_key_input = st.text_input("Wprowadź swój klucz OpenAI:", type="password")
         if openai_key_input:
             st.session_state['openai_key'] = openai_key_input
-            st.experimental_rerun()
         st.stop()  # Zatrzymaj aplikację, dopóki nie ma klucza
 
     openai_key = st.session_state['openai_key']
