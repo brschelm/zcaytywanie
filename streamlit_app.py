@@ -72,7 +72,7 @@ def estimate_vision_cost_pln(image_file, usd_to_pln=4.00, price_per_mpx_usd=0.01
 # Streamlit UI
 def main():
     st.title("Ekstrakcja danych z dokumentów (OpenAI Vision)")
-    st.write("Wgraj plik (faktura, rachunek, inny dokument) w formacie PNG, JPEG, JPG, WEBP lub GIF. Dane zostaną wyciągnięte przez GPT-4o.")
+    st.write("Aby korzystać z aplikacji, musisz podać własny klucz OpenAI. Klucz nie jest nigdzie zapisywany.")
 
     # Obsługa klucza OpenAI w session_state
     if 'openai_key' not in st.session_state:
@@ -83,14 +83,15 @@ def main():
         if openai_key_input:
             st.session_state['openai_key'] = openai_key_input
             st.experimental_rerun()
-        openai_key = None
-    else:
-        openai_key = st.session_state['openai_key']
+        st.stop()  # Zatrzymaj aplikację, dopóki nie ma klucza
 
+    openai_key = st.session_state['openai_key']
+
+    # Reszta aplikacji widoczna tylko po podaniu klucza
     custom_prompt = st.text_area("Własny prompt (opcjonalnie)", value="Wyciągnij wszystkie czytelne dane z dokumentu. Dane przedstaw w formacie JSON. Tylko dane, bez komentarzy.")
     uploaded_file = st.file_uploader("Wybierz plik (PNG, JPEG, JPG, WEBP, GIF)", type=["png", "jpg", "jpeg", "webp", "gif"])
 
-    if uploaded_file and openai_key:
+    if uploaded_file:
         with st.spinner("Przetwarzanie pliku przez OpenAI Vision..."):
             try:
                 # Szacowanie kosztu
@@ -120,8 +121,6 @@ def main():
                 )
             except Exception as e:
                 st.error(f"Błąd podczas przetwarzania: {e}")
-    elif uploaded_file and not openai_key:
-        st.warning("Podaj klucz OpenAI, aby rozpocząć przetwarzanie.")
 
 if __name__ == "__main__":
     main() 
