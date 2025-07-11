@@ -74,9 +74,19 @@ def main():
     st.title("Ekstrakcja danych z dokumentów (OpenAI Vision)")
     st.write("Wgraj plik (faktura, rachunek, inny dokument) w formacie PNG, JPEG, JPG, WEBP lub GIF. Dane zostaną wyciągnięte przez GPT-4o.")
 
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if not openai_key:
-        openai_key = st.text_input("Wprowadź swój klucz OpenAI:", type="password")
+    # Obsługa klucza OpenAI w session_state
+    if 'openai_key' not in st.session_state:
+        st.session_state['openai_key'] = os.getenv("OPENAI_API_KEY")
+
+    if not st.session_state['openai_key']:
+        openai_key_input = st.text_input("Wprowadź swój klucz OpenAI:", type="password")
+        if openai_key_input:
+            st.session_state['openai_key'] = openai_key_input
+            st.experimental_rerun()
+        openai_key = None
+    else:
+        openai_key = st.session_state['openai_key']
+
     custom_prompt = st.text_area("Własny prompt (opcjonalnie)", value="Wyciągnij wszystkie czytelne dane z dokumentu. Dane przedstaw w formacie JSON. Tylko dane, bez komentarzy.")
     uploaded_file = st.file_uploader("Wybierz plik (PNG, JPEG, JPG, WEBP, GIF)", type=["png", "jpg", "jpeg", "webp", "gif"])
 
