@@ -88,38 +88,88 @@ def main():
 
     # Reszta aplikacji widoczna tylko po podaniu klucza
     custom_prompt = st.text_area("Własny prompt (opcjonalnie)", value="Wyciągnij wszystkie czytelne dane z dokumentu. Dane przedstaw w formacie JSON. Tylko dane, bez komentarzy.")
-    uploaded_file = st.file_uploader("Wybierz plik (PNG, JPEG, JPG, WEBP, GIF)", type=["png", "jpg", "jpeg", "webp", "gif"])
+    uploaded_files = st.file_uploader("Wybierz pliki (PNG, JPEG, JPG, WEBP, GIF)", type=["png", "jpg", "jpeg", "webp", "gif"], accept_multiple_files=True)
 
-    if uploaded_file:
-        with st.spinner("Przetwarzanie pliku przez OpenAI Vision..."):
-            try:
-                # Szacowanie kosztu
-                cost_pln, megapixels = estimate_vision_cost_pln(uploaded_file)
-                st.info(f"Szacowany koszt przetworzenia tego obrazu: {cost_pln} zł (rozmiar: {megapixels} MPx)")
-                uploaded_file.seek(0)  # Reset, bo był już czytany
-                data = extract_document_data(openai_key, uploaded_file, uploaded_file.type, custom_prompt)
-                if isinstance(data, dict):
-                    df = pd.json_normalize(data)
-                elif isinstance(data, list):
-                    df = pd.DataFrame(data)
-                else:
-                    df = pd.DataFrame({"raw_response": [str(data)]})
-                st.success("Dane wyciągnięte!")
-                st.dataframe(df)
-
-                # Eksport do Excela
-                output = BytesIO()
-                df.to_excel(output, index=False)
-                output.seek(0)
-                now = datetime.now().strftime("%Y%m%d_%H%M%S")
-                st.download_button(
-                    label="Pobierz jako Excel",
-                    data=output,
-                    file_name=f"dane_z_dokumentu_{now}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            except Exception as e:
-                st.error(f"Błąd podczas przetwarzania: {e}")
+    if uploaded_files:
+        st.write(f"**Wczytano {len(uploaded_files)} plik(ów):**")
+        
+        # Szacowanie kosztu dla wszystkich plików
+        total_cost = 0
+        file_info = []
+        
+        for i, uploaded_file in enumerate(uploaded_files):
+            cost_pln, megapixels = estimate_vision_cost_pln(uploaded_file)
+            total_cost += cost_pln
+            
+            # Pobierz rozdzielczość obrazu
+            uploaded_file.seek(0)
+            img = Image.open(uploaded_file)
+            width, height = img.size
+            
+            file_info.append({
+                'name': uploaded_file.name,
+                'cost': cost_pln,
+                'megapixels': megapixels,
+                'resolution': f"{width}×{height} px"
+            })
+            
+            st.write(f"📄 **{uploaded_file.name}**: {cost_pln} PLN ({megapixels} MPx, {width}×{height} px)")
+        
+        st.info(f"**Łączny szacowany koszt: {total_cost:.4f} PLN**")
+        
+        # Przycisk do przetwarzania
+        if st.button("🚀 Przetwórz dokumenty", type="primary"):
+            all_results = []
+            
+            with st.spinner(f"Przetwarzanie {len(uploaded_files)} plików przez OpenAI Vision..."):
+                for i, uploaded_file in enumerate(uploaded_files):
+                    st.write(f"Przetwarzanie {i+1}/{len(uploaded_files)}: {uploaded_file.name}")
+                    
+                    try:
+                        uploaded_file.seek(0)  # Reset, bo był już czytany
+                        data = extract_document_data(openai_key, uploaded_file, uploaded_file.type, custom_prompt)
+                        
+                        # Dodaj nazwę pliku do wyników
+                        if isinstance(data, dict):
+                            data['plik'] = uploaded_file.name
+                        elif isinstance(data, list):
+                            for item in data:
+                                item['plik'] = uploaded_file.name
+                        
+                        all_results.append(data)
+                        st.success(f"✅ {uploaded_file.name} - przetworzony")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Błąd podczas przetwarzania {uploaded_file.name}: {e}")
+                        all_results.append({"plik": uploaded_file.name, "błąd": str(e)})
+            
+            # Wyświetl wyniki
+            if all_results:
+                st.success("🎉 Wszystkie pliki przetworzone!")
+                
+                # Połącz wszystkie wyniki w jeden DataFrame
+                combined_data = []
+                for result in all_results:
+                    if isinstance(result, dict) and "błąd" not in result:
+                        combined_data.append(result)
+                    elif isinstance(result, list):
+                        combined_data.extend(result)
+                
+                if combined_data:
+                    df = pd.json_normalize(combined_data)
+                    st.dataframe(df)
+                    
+                    # Eksport do Excela
+                    output = BytesIO()
+                    df.to_excel(output, index=False)
+                    output.seek(0)
+                    now = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    st.download_button(
+                        label="📥 Pobierz wszystkie dane jako Excel",
+                        data=output,
+                        file_name=f"dane_z_dokumentow_{now}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
 if __name__ == "__main__":
     main() 
